@@ -1,0 +1,144 @@
+---
+title: "Exploring the BRFSS data"
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(ggmosaic)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `brfss2013`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("brfss2013.Rdata")
+```
+
+
+* * *
+
+## Part 1: Data
+
+**Does the data use random sampling?**
+
+The BRFSS does employ a form of random sampling since the probability of any adult
+family member answering the landline phone is the same. 
+Initially, I thought people who don't use telephones or don't have landlines would
+be underrepresented and that this would introduce bias it the data set. However, 
+after reading the study methodology on the CDC website I can see the Raking method
+they use for weighting adjusts for these problems.
+
+**Does the data make use of random assignment?**
+
+Since this is an observational study and no control, experiment groups exist. This
+study does not use random assignment. 
+This also means that this data can help to illustrate association between different 
+variables, but not causation. 
+
+
+* * *
+
+## Part 2: Research questions
+
+**Research question 1:**
+Are people diagnosed with COPD likely to have smoked at least a 100 cigarettes?  
+
+
+_Why does it matter?:_
+I have friends who smoke but believe it is alright since they don't smoke 'a lot.'
+The aim here is to see if even smoking a relatively small number of cigarettes 
+has any relation with serious health conditions such as COPD
+
+**Research question 2:**
+
+**Research question 3:**
+
+
+* * *
+
+
+## Part 3: Exploratory data analysis
+
+
+**Research question 1:**
+
+```{r}
+req_data <- brfss2013 %>%
+  select(smoke100, chccopd1,sex, X_age80) %>%
+  mutate(chccopd100 = case_when(
+    smoke100 == 'Yes' & chccopd1 == 'Yes' ~ 'Has COPD and smoker',
+    smoke100 == 'No' & chccopd1 == 'Yes' ~ 'Has COPD and non-smoker ')) %>%
+  na.omit() %>%
+  mutate(chccopd100 = as.factor(chccopd100))
+```
+
+```{r}
+ggplot(data=req_data, width=2) +
+  geom_bar(aes(x = chccopd100, fill=chccopd100), position = 'dodge',
+           stat = 'count') +
+  scale_fill_brewer(type='qualitative', palette = 'Accent') +
+  labs(x=element_blank(), y = 'Number of cases') +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = 'none', axis.text.x=element_text(size = 12),
+        axis.text.y=element_text(size=12))
+
+```
+
+**Summary Statistics:**
+```{r}
+req_data %>%
+  group_by(chccopd100, sex) %>%
+  summarise(count=n(), avg_age=round(mean(X_age80)))
+```
+
+*Explanation:*  
+In the table above, we can see the average profile of a person afflicted with 
+COPD in the survey. We also see that the vast majority of these people have smoked
+at least a hundred cigarettes.   
+This hints at a potential link between smoking and COPD. However, it is important to
+note that the overall brfss2013 data set is heavily skewed towards people that don't have
+COPD and the number of people who have smoked more than a hundred cigarettes and still don't 
+have COPD is very large as shown by the table below:
+```{r}
+brfss2013 %>%
+  select(smoke100, chccopd1, X_age80) %>%
+  mutate(smoker_non_copd = ifelse((smoke100=='Yes' & chccopd1=='No'),'No COPD and smoker',NA)) %>%
+  mutate(smoker_non_copd = as.factor(smoker_non_copd)) %>%
+  group_by(smoker_non_copd) %>%
+  na.omit() %>%
+  summarise(count = n(), avg_age=round(mean(X_age80)))
+```
+One thing to notice here is that the average age of people who smoke but haven't
+developed COPD is significantly lower than those that have. This suggests that there
+may be a link between smoking and developing COPD, even if the onset of the disease
+is in older age. 
+
+
+
+**Research question 2:**
+
+```{r}
+
+```
+
+
+
+**Research question 3:**
+
+```{r}
+
+```
+
