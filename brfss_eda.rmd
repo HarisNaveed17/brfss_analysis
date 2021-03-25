@@ -14,14 +14,10 @@ output:
 ```{r load-packages, message = FALSE}
 library(ggplot2)
 library(dplyr)
-library(ggmosaic)
+library(tidyverse)
 ```
 
 ### Load data
-
-Make sure your data and R Markdown files are in the same directory. When loaded
-your data file will be called `brfss2013`. Delete this note when before you submit 
-your work. 
 
 ```{r load-data}
 load("brfss2013.Rdata")
@@ -54,17 +50,24 @@ variables, but not causation.
 ## Part 2: Research questions
 
 **Research question 1:**
-Are people diagnosed with COPD likely to have smoked at least a 100 cigarettes?  
+Are people diagnosed with COPD (Chronic obstructive pulmonary disease) likely to have smoked at least a 100 cigarettes?  
 
 
-_Why does it matter?:_
-I have friends who smoke but believe it is alright since they don't smoke 'a lot.'
-The aim here is to see if even smoking a relatively small number of cigarettes 
-has any relation with serious health conditions such as COPD
+_Why does it matter?_  
+I have friends who smoke but believe it is alright since they don't smoke 'a lot.' The aim here is to see if even smoking a relatively small number of cigarettes has any relation with serious health conditions such as COPD
 
 **Research question 2:**
+Does the time spent walking and sleeping impact the general health of college age people (18 - 24Y)  
 
-**Research question 3:**
+_Why does it matter?_  
+I'm a college student who is very fond of walking and regularly sacrifices sleep. I'm certain I'm not alone.
+
+
+**Research question 3:**  
+How does feeling of worthlessness vary among people of different employmnent status (students, retirees, employed for wages and homemakers) and is this feeling related to annual household income?
+
+_Why does it matter?_  
+I'm about to graduate and it would be interesting to see if people derive a sense of worth from their work more than students do from their studies.  
 
 
 * * *
@@ -73,7 +76,8 @@ has any relation with serious health conditions such as COPD
 ## Part 3: Exploratory data analysis
 
 
-**Research question 1:**
+**Research question 1:**  
+First we choose the data relevant to our question. We drop all samples that didn't answer the relevant questions and convert the two   relevant cases to factors.
 
 ```{r}
 req_data <- brfss2013 %>%
@@ -84,6 +88,18 @@ req_data <- brfss2013 %>%
   na.omit() %>%
   mutate(chccopd100 = as.factor(chccopd100))
 ```
+
+If we work out the statistics of this data, we will get a high level overview of the profile of the average COPD patient.  
+
+```{r}
+req_data %>%
+  group_by(chccopd100, sex) %>%
+  summarise(count=n(), avg_age=round(mean(X_age80)))
+```
+
+We see that the people diagnosed with COPD who were also smokers are nearly two-thirds female with an average age of  
+62 and one-third male with an average age of 63. The total people that have COPD and smoked more than a hundred cigarettes during  
+their lifetimes are 29,991 out of 39,602 total COPD cases. A graphical depiction of this finding is below:  
 
 ```{r}
 ggplot(data=req_data, width=2) +
@@ -97,21 +113,12 @@ ggplot(data=req_data, width=2) +
 
 ```
 
-**Summary Statistics:**
-```{r}
-req_data %>%
-  group_by(chccopd100, sex) %>%
-  summarise(count=n(), avg_age=round(mean(X_age80)))
-```
-
-*Explanation:*  
-In the table above, we can see the average profile of a person afflicted with 
-COPD in the survey. We also see that the vast majority of these people have smoked
-at least a hundred cigarettes.   
+We've seen the average profile of a person afflicted with COPD in the survey. We also see that the vast majority of these people have smoked at least a hundred cigarettes.     
 This hints at a potential link between smoking and COPD. However, it is important to
 note that the overall brfss2013 data set is heavily skewed towards people that don't have
 COPD and the number of people who have smoked more than a hundred cigarettes and still don't 
-have COPD is very large as shown by the table below:
+have COPD is very large as shown by the table below:  
+
 ```{r}
 brfss2013 %>%
   select(smoke100, chccopd1, X_age80) %>%
@@ -121,24 +128,135 @@ brfss2013 %>%
   na.omit() %>%
   summarise(count = n(), avg_age=round(mean(X_age80)))
 ```
-One thing to notice here is that the average age of people who smoke but haven't
-developed COPD is significantly lower than those that have. This suggests that there
-may be a link between smoking and developing COPD, even if the onset of the disease
+One thing to notice here is that the average age of people who smoke but haven't developed COPD is significantly lower than those that have. This suggests that there may be a link between smoking and developing COPD, even if the onset of the disease
 is in older age. 
 
-
-
-**Research question 2:**
+**Research question 2:**  
+We first retrieve the data of our interest by filtering by activity and age and selecting the relevant columns. We also perform some pre-processing on the exercise columns and combine them to find the number of minutes spent walking per week, which is represented by 'exermin_perweek'  
 
 ```{r}
+req_data2 <- brfss2013 %>%
+  filter((X_age80 >= 18 & X_age80 <= 24) & (exract11 == 'Walking')) %>%
+  select(sleptim1, exeroft1, exerhmm1, genhlth) %>%
+  na.omit() %>%
+  mutate(exeroft1_weekly = if_else(exeroft1 >= 200, ceiling((exeroft1 - 200)/4), exeroft1-100)) %>%
+  mutate(exerhmm1_min = if_else(exerhmm1 >= 100, 60*floor(exerhmm1/100)+100*((exerhmm1/100)%%1),
+                                as.double(exerhmm1))) %>%
+  mutate(exermin_perweek = (round(exeroft1_weekly*exerhmm1_min)))
 
 ```
 
-
-
-**Research question 3:**
+We then determine the average number of hours of sleep and the median number of minutes spent walking per week by our chosen demographic against their self - reported health condition. We choose the median for 'time spent walking' because it is a robust statistic and calculating the mean gives vastly higher values, which is probably because of extreme outliers.  
+We stick with using mean in 'sleep time' because the median and mean of that column are fairly similar, indicating that there are no significant outliers in this case.  
 
 ```{r}
+summary_stats2 <- req_data2 %>%
+  group_by(genhlth) %>%
+  summarise(count = n(), avg_sleep = mean(sleptim1), median_exermin_wk=median(exermin_perweek))
+summary_stats2
 
 ```
+We see that people who report being in excellent shape sleep more than 7 hours and spend about 3 hours per week walking. The differences  between this group and other groups are illustrated in the two bar plots below.  
+```{r}
+ggplot(data = summary_stats2, aes(x=genhlth, y=avg_sleep, fill=genhlth)) +
+  geom_col() +
+  coord_flip() +
+  theme_minimal() +
+  scale_fill_manual("legend", values = c("Poor" = "dark red", "Excellent" = "dark green",
+                                         "Good" = 'gray','Very good'='gray',
+                                         'Fair'='gray')) + 
+  theme(legend.position = 'none') +
+  labs(x='Reported health condition', y='Average Hrs of Sleep per night')
+```
 
+We see here that people with excellent health sleep more than 7 hours per night. The next 2 categories report fairly similar numbers, then we see a larger decline in the 'fair' and 'poor' categories, with people in the 'poor' category reporting the lowest sleep times (around 6 hours).    
+```{r}
+summary_stats2 %>%
+  ggplot(aes(x=median_exermin_wk, y=genhlth, fill=genhlth)) +
+  geom_col() +
+  theme_minimal() +
+  scale_fill_manual("legend", values = c("Poor" = "dark red", "Excellent" = "dark green",
+                                         "Good" = 'gray','Very good'='gray',
+                                         'Fair'='gray')) + 
+  theme(legend.position = 'none') +
+  labs(y='Reported health condition', x='Median minutes of walking per week')
+  
+```
+
+In general, we see that people who report their physical and mental health as 'poor' tend to be those that sleep the least  
+(roughly 6 hours) and also exert the most (walking 4 hours per week against 3 hours for the 'Excellent' category)
+
+Hence, we can say that there is some link between walking and sleeping and the general health of a young college age person.  
+In general, 7 hours of sleep per night with moderate walking frequency is ideal. Whereas over-exertion and poor sleep times contribute  
+to poorer health conditions.
+
+**Research question 3:**    
+We'll start off, as always, by pulling out the data relevant to our question. 
+
+```{r}
+req_data3 <- brfss2013 %>%
+  select(employ1, income2, miswtles) %>%
+  na.omit() %>%
+  filter(employ1 == 'A student' | employ1 == 'A homemaker' | employ1 == 'Retired' 
+         | employ1 == 'Employed for wages') %>%
+  droplevels()
+```
+
+Let's get a quick look at what sort of data we have:
+```{r}
+req_data3 %>%
+  group_by(miswtles) %>%
+  summarise(count  =n())
+```
+We see that the vast majority of people in our data set report not feeling worthless even once a month. Let's remove these cases and take a closer look at the rest
+
+```{r}
+req_data3 <- req_data3 %>%
+  filter(miswtles != 'None') %>%
+  droplevels()
+```
+
+```{r}
+req_data3 %>%
+  group_by(miswtles, employ1, .add = TRUE) %>%
+  summarise(count = n())
+
+```
+We see that the vast majority of people who report feeling worthless all or most of the time during a month are retirees. Retirees are also dominant in the other two categories.    
+Wage employees are the second most affected group after retirees, followed by homemakers and finally students.  
+
+Let's take a look at the income breakdown of these categories. For simplicity, we're going to collapse the current income groups into four, namely: 'Less than $25K', 'Less than $50K', 'Less than $75K', 'More than $75,000' and rename them to something more concise.
+
+```{r}
+req_data3$income2 <- fct_collapse(req_data3$income2,  '<25K' = c('Less than $10,000','Less than $15,000','Less than $20,000',
+                                                 'Less than $25,000'),
+               '<50K' = c('Less than $35,000','Less than $50,000'),
+               '<75K' = c('Less than $75,000'),
+               '>75K' = c('$75,000 or more'))
+```
+
+A high level view of the distribution with respect to income and employment can be seen in the table below:  
+
+```{r}
+table(req_data3$employ1, req_data3$income2, req_data3$miswtles)
+
+```
+We see that feelings of worthlessness decrease as we move up the income bracket. This is the case for the 'All' and 'Most' category. For the milder 'Some' and 'little' categories the income level becomes more or less irrelevant.  
+
+The facet bar graph below illustrates all these relationships together:
+```{r}
+req_data3 %>%
+  ggplot(aes(income2, fill=miswtles), position_dodge(width = 1)) + 
+  geom_bar(position=position_dodge(width = 1)) + 
+  facet_grid(.~employ1, switch = 'x') +
+  theme_bw() +
+  theme(strip.placement = "outside",
+        strip.background = element_blank(),
+        panel.border = element_blank(),
+        panel.spacing = unit(0, "points"),
+        axis.line = element_line()) +
+  labs(title = 'Feeling worthless vs Position and Income',  x='Employment status', 
+       fill= 'Frequency of feeling\n per month')
+```    
+  
+All in all, we can see that all people regardless of employment status suffer from feelings of worthlessness every month. However, the severity of these feelings is particularly pronounced in the retirees, and then salaried people. People with higher incomes tend to feel worthless less frequently but income level doesn't seem to have a reciprocal relationship with frequency of feeling.  
